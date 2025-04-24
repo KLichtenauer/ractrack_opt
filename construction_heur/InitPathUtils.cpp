@@ -20,7 +20,7 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
         }
     }
 
-    cout << "Starting clearance evaluation.";
+    cout << "\n Starting clearance evaluation.";
 
     while (!qClearence.empty() && qClearence.size() > 0) {
         Coord c = qClearence.front();
@@ -39,12 +39,9 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
                 qClearence.emplace_back(row, column);
             }
         }
-        cout << to_string(qClearence.size()) + "\n";
-        cout << to_string(qClearence.size() > 0) + "\n";
-
     }
 
-    cout << "Finished clearance.";
+    cout << "\n Finished clearance.";
 
 
     using State = pair<int, Coord>;
@@ -100,48 +97,43 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
                 qPath.emplace_back(x, y);
             }
         }
-        cout << to_string(qPath.size()) + "\n";
-        cout << to_string(qPath.size() > 0) + "\n";
-        cout << "Planing";
     }
 
-    cout << "Finished planing shortest path.";
 
+    cout << "Finished planing shortest path. \n";
 
 
     // Extracting path:
-
     // The final path:
     vector<Coord> path;
 
     // Find the best solution from the finish line entries.
     vector<Coord> finishLine = t.finishLine;
-    cout << "FINISHLINE SIZE" << finishLine.size();
     Coord bestFinishTile = finishLine.at(0);
     for (auto finishTile: finishLine) {
         if (weightedGrid[finishTile.row][finishTile.col].first < weightedGrid[bestFinishTile.row][bestFinishTile.col].first) {
-            bestFinishTile = weightedGrid[finishTile.row][finishTile.col].second;
+            bestFinishTile = Coord(finishTile);
         }
 
     }
-    cout << "Figured best finish tile";
     // Track back with parents and put it in paths.
     bool arrivedStart = false;
     Coord currentCoord = bestFinishTile;
+    path.push_back(bestFinishTile);
+
     while (!arrivedStart) {
         Coord parent = weightedGrid[currentCoord.row][currentCoord.col].second;
-        path.emplace_back(parent);
+        path.insert(path.begin(), parent);
         // Stop when distance of point is 0 (starting point found).
         if (weightedGrid[parent.row][parent.col].first == 0 || (parent.row == start.row && parent.col == start.col)) {
-            cout << "Start found" << parent.row << "," << parent.col;
+            cout << "\n Start found" << parent.row << "," << parent.col;
             arrivedStart = true;
         }
         currentCoord = parent;
-        cout << "Current parrent: " << to_string(parent.row) << to_string(parent.col);
-        cout << "THE START NODE: " << start.row << start.col << "\n";
     }
 
-    cout << "Minimum path found with size: " + to_string(path.size());
+
+    cout << "\n Minimum path found with size: " + to_string(path.size());
 
 
     return path;

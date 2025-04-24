@@ -1,9 +1,9 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.5.26)  24 APR 2025 08:09
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.5.26)  24 APR 2025 09:42
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
-**data/outputs
-(../data/outputs/output
+**outputs/track_10
+(./outputs/track_10
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-02-20>
 (/usr/local/texlive/2024/texmf-dist/tex/latex/standalone/standalone.cls
@@ -377,8 +377,8 @@ File: l3backend-pdftex.def 2024-02-20 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count286
 \l__pdf_internal_box=\box63
 )
-No file output.aux.
-\openout1 = `output.aux'.
+No file track_10.aux.
+\openout1 = `track_10.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 5.
 LaTeX Font Info:    ... okay on input line 5.
@@ -431,23 +431,23 @@ Missing character: There is no ; in font nullfont!
 [1
 
 {/usr/local/texlive/2024/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
-(./output.aux)
+(./track_10.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-02-20>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 12349 strings out of 474116
- 258782 string characters out of 5743682
- 2446187 words of memory out of 5000000
- 34516 multiletter control sequences out of 15000+600000
+ 12344 strings out of 474116
+ 258693 string characters out of 5743682
+ 2493187 words of memory out of 5000000
+ 34513 multiletter control sequences out of 15000+600000
  558666 words of font info for 38 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 117i,7n,121p,409b,553s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 117i,7n,121p,1051b,553s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb>
 </usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb>
-Output written on output.pdf (1 page, 90180 bytes).
+Output written on track_10.pdf (1 page, 96343 bytes).
 PDF statistics:
  21 PDF objects out of 1000 (max. 8388607)
  13 compressed objects within 1 object stream

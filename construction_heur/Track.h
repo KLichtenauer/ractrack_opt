@@ -71,12 +71,11 @@ public:
       for (int column = 0; column < width(); column++) {
         if (rows[row][column] == 'S') {
           start = Coord(row, column);
-          cout << "START FOUND!°°°°!! " << start.col;
         }
         if (rows[row][column] == 'F') {
           finishLine.emplace_back(row, column);
+          cout << "FINISH LINE FOUND: " << row << column << "\n";
         }
-        cout << "START : " << start.col;
       }
     }
     return true;
@@ -86,7 +85,9 @@ public:
     return rows[row][column];
   }
 
-  static string to_json(const vector<Coord> &path);
+  //static string to_json(const vector<Coord> &path, int height);
+  static string to_json(const vector<Coord>& path, const int height);
+
 };
 
 

@@ -9,7 +9,7 @@
 using namespace std;
 
 int main() {
-    string inputFile = "track_02";
+    string inputFile = "track_10";
     string inputPath = "../data/programmingExercise/" + inputFile + ".t";
     Track t;
     if (!t.load(inputPath)) return 1;
@@ -33,18 +33,19 @@ int main() {
         return 1;
     }
 
-    outFile << Track::to_json(initPath);
+    outFile << Track::to_json(initPath, t.height());
 
     outFile.close();
 
-    string trackFilePath = "data/programmingExercise/" + inputFile + ".t";
-    string tripFilePath = "data/" + shortestPathOutputFilePath;
-    string outputFilePath = "../data/outputs";
-    string visCmd = "cd .. && ./data/visualise.pl " + trackFilePath + " " + tripFilePath + " " + outputFilePath;
+    string trackFilePath = "programmingExercise/" + inputFile + ".t";
+    string tripFilePath = shortestPathOutputFilePath;
+    string outputFilePath = "outputs/" + inputFile;
+    string visCmd = "pwd && cd .. && cd data && pwd && ./visualise.pl " + trackFilePath + " " + tripFilePath + " " + outputFilePath;
     cout << "On console:   " + visCmd;
     system(visCmd.c_str());
 
-    string pdfLatexCmd = "pdflatex " + outputFilePath;
+
+    string pdfLatexCmd = "pwd && cd .. && cd data && pdflatex " +  outputFilePath;
     cout << "On Console:   " + pdfLatexCmd;
     system(pdfLatexCmd.c_str());
 }
