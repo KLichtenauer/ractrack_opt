@@ -1,0 +1,150 @@
+//
+// Created by Privati on 23.04.25.
+//
+
+#include "InitPathUtils.h"
+#include "Track.h"
+
+vector<Coord> InitPathUtils::initPath(Track &t) {
+    //vector<vector<bool> > gridToCheck(t.height(), vector<bool>(t.width(), false));
+
+    deque<Coord> qClearence;
+    vector<vector<int> > clearance(t.height(), vector<int>(t.width(), INT_MAX));
+
+    for (int row = 0; row < t.height(); row++) {
+        for (int column = 0; column < t.width(); column++) {
+            if (t.at(row, column) == 'G') {
+                clearance[row][column] = 0;
+                qClearence.emplace_back(row, column);
+            }
+        }
+    }
+
+    cout << "Starting clearance evaluation.";
+
+    while (!qClearence.empty() && qClearence.size() > 0) {
+        Coord c = qClearence.front();
+        qClearence.pop_front();
+        for (auto [row, column]: {
+                 pair<int, int>{c.row - 1, c.col},
+                 pair<int, int>{c.row, c.col - 1},
+                 pair<int, int>{c.row + 1, c.col},
+                 pair<int, int>{c.row, c.col + 1}
+             }) {
+            if (row < 0 || column < 0 || row >= t.height() || column >= t.width()) continue;
+            if (t.at(row, column) == 'O' || t.at(row, column) == 'G') continue;
+
+            if (clearance[row][column] > clearance[c.row][c.col] + 1) {
+                clearance[row][column] = clearance[c.row][c.col] + 1;
+                qClearence.emplace_back(row, column);
+            }
+        }
+        cout << to_string(qClearence.size()) + "\n";
+        cout << to_string(qClearence.size() > 0) + "\n";
+
+    }
+
+    cout << "Finished clearance.";
+
+
+    using State = pair<int, Coord>;
+
+    vector<vector<State> > weightedGrid(t.height(), vector<State>(t.width(), {INT_MAX, Coord(0, 0)}));
+
+    for (int c = 0; c < t.width(); c++) {
+        for (int r = 0; r < t.height(); r++) {
+            weightedGrid[r][c].second = Coord{r, c};
+        }
+    }
+
+
+    // Plan the shortest path with weighted map to avoid grass.
+    const Coord start = t.start;
+    weightedGrid[start.row][start.col].first = 0;
+
+    deque<Coord> qPath;
+    qPath.push_back(start);
+
+    while (!qPath.empty() && qPath.size() > 0) {
+        Coord c = qPath.front();
+        qPath.pop_front();
+
+        for (auto [x, y]: {
+                 pair<int, int>{c.row - 1, c.col},
+                 pair<int, int>{c.row, c.col - 1},
+                 pair<int, int>{c.row + 1, c.col},
+                 pair<int, int>{c.row, c.col + 1}
+             }) {
+            int K = 2;
+            int EXTRA_GRASS_COST = 4;
+            int base = 1; // Every move costs one
+
+            if (x < 0 || y < 0 || x >= t.height() || y >= t.width()) continue;
+            // Continue if Finish, Obstacle or Start tile
+            if (t.at(x, y) == 'O' || t.at(x, y) == 'S') continue;
+
+
+            // Else:
+            int currentCost = weightedGrid[c.row][c.col].first + K / (clearance[x][y] + 1) + base +
+                              (t.at(x, y) == 'G'
+                                   ? EXTRA_GRASS_COST
+                                   : 0);
+
+            if (weightedGrid[x][y].first > currentCost) {
+                weightedGrid[x][y].first = currentCost;
+                weightedGrid[x][y].second = Coord{c.row, c.col};
+
+                if ( t.at(x, y) == 'F') {
+                    continue;
+                }
+                qPath.emplace_back(x, y);
+            }
+        }
+        cout << to_string(qPath.size()) + "\n";
+        cout << to_string(qPath.size() > 0) + "\n";
+        cout << "Planing";
+    }
+
+    cout << "Finished planing shortest path.";
+
+
+
+    // Extracting path:
+
+    // The final path:
+    vector<Coord> path;
+
+    // Find the best solution from the finish line entries.
+    vector<Coord> finishLine = t.finishLine;
+    cout << "FINISHLINE SIZE" << finishLine.size();
+    Coord bestFinishTile = finishLine.at(0);
+    for (auto finishTile: finishLine) {
+        if (weightedGrid[finishTile.row][finishTile.col].first < weightedGrid[bestFinishTile.row][bestFinishTile.col].first) {
+            bestFinishTile = weightedGrid[finishTile.row][finishTile.col].second;
+        }
+
+    }
+    cout << "Figured best finish tile";
+    // Track back with parents and put it in paths.
+    bool arrivedStart = false;
+    Coord currentCoord = bestFinishTile;
+    while (!arrivedStart) {
+        Coord parent = weightedGrid[currentCoord.row][currentCoord.col].second;
+        path.emplace_back(parent);
+        // Stop when distance of point is 0 (starting point found).
+        if (weightedGrid[parent.row][parent.col].first == 0 || (parent.row == start.row && parent.col == start.col)) {
+            cout << "Start found" << parent.row << "," << parent.col;
+            arrivedStart = true;
+        }
+        currentCoord = parent;
+        cout << "Current parrent: " << to_string(parent.row) << to_string(parent.col);
+        cout << "THE START NODE: " << start.row << start.col << "\n";
+    }
+
+    cout << "Minimum path found with size: " + to_string(path.size());
+
+
+    return path;
+}
+
+
