@@ -6,25 +6,26 @@
 #include "Track.h"
 
 vector<Coord> InitPathUtils::initPath(Track &t) {
-    //vector<vector<bool> > gridToCheck(t.height(), vector<bool>(t.width(), false));
 
-    deque<Coord> qClearence;
+    // Clearance maps each tile to a number defining how far its away from grass.
+    deque<Coord> qClearance;
     vector<vector<int> > clearance(t.height(), vector<int>(t.width(), INT_MAX));
 
+    // Init clearance with Grass map.
     for (int row = 0; row < t.height(); row++) {
         for (int column = 0; column < t.width(); column++) {
             if (t.at(row, column) == 'G') {
                 clearance[row][column] = 0;
-                qClearence.emplace_back(row, column);
+                qClearance.emplace_back(row, column);
             }
         }
     }
 
     cout << "\n Starting clearance evaluation.";
 
-    while (!qClearence.empty() && qClearence.size() > 0) {
-        Coord c = qClearence.front();
-        qClearence.pop_front();
+    while (!qClearance.empty() && qClearance.size() > 0) {
+        Coord c = qClearance.front();
+        qClearance.pop_front();
         for (auto [row, column]: {
                  pair<int, int>{c.row - 1, c.col},
                  pair<int, int>{c.row, c.col - 1},
@@ -36,7 +37,7 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
 
             if (clearance[row][column] > clearance[c.row][c.col] + 1) {
                 clearance[row][column] = clearance[c.row][c.col] + 1;
-                qClearence.emplace_back(row, column);
+                qClearance.emplace_back(row, column);
             }
         }
     }
@@ -66,14 +67,16 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
         Coord c = qPath.front();
         qPath.pop_front();
 
+        // Only moves are up, down, left, right (nothing diagonal)
         for (auto [x, y]: {
                  pair<int, int>{c.row - 1, c.col},
                  pair<int, int>{c.row, c.col - 1},
                  pair<int, int>{c.row + 1, c.col},
                  pair<int, int>{c.row, c.col + 1}
              }) {
+
             int K = 2;
-            int EXTRA_GRASS_COST = 4;
+            int EXTRA_GRASS_COST = 4; // Costs for being in grass. (If move takes 5 normal tiles it chooses the grass path rather than the way around)
             int base = 1; // Every move costs one
 
             if (x < 0 || y < 0 || x >= t.height() || y >= t.width()) continue;
@@ -82,7 +85,7 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
 
 
             // Else:
-            int currentCost = weightedGrid[c.row][c.col].first + K / (clearance[x][y] + 1) + base +
+            const int currentCost = weightedGrid[c.row][c.col].first + K / (clearance[x][y] + 1) + base +
                               (t.at(x, y) == 'G'
                                    ? EXTRA_GRASS_COST
                                    : 0);
@@ -99,12 +102,9 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
         }
     }
 
-
     cout << "Finished planing shortest path. \n";
 
-
-    // Extracting path:
-    // The final path:
+    // Extracting path. The final path:
     vector<Coord> path;
 
     // Find the best solution from the finish line entries.

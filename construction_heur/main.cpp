@@ -14,19 +14,15 @@ int main() {
     Track t;
     if (!t.load(inputPath)) return 1;
 
-
+    // Logging the map:
     cout << "Map size: " << t.width() << " × " << t.height() << "\n";
-    // e.g. print the map back out:
     for (int y = 0; y < t.height(); ++y)
         cout << t.rows[y] << "\n";
 
 
-    cout << t.start.col << t.start.row;
-
     vector<Coord> initPath= InitPathUtils::initPath(t);
 
     string shortestPathOutputFilePath = "../data/init_paths/" + inputFile + ".json";
-
     ofstream outFile(shortestPathOutputFilePath);
     if (!outFile) {
         cerr << "Error: unable to open output file." << endl;
@@ -43,7 +39,6 @@ int main() {
     string visCmd = "pwd && cd .. && cd data && pwd && ./visualise.pl " + trackFilePath + " " + tripFilePath + " " + outputFilePath;
     cout << "On console:   " + visCmd;
     system(visCmd.c_str());
-
 
     string pdfLatexCmd = "pwd && cd .. && cd data && pdflatex " +  outputFilePath;
     cout << "On Console:   " + pdfLatexCmd;
