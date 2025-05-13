@@ -8,6 +8,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 using namespace std;
 
@@ -74,7 +75,6 @@ public:
         }
         if (rows[row][column] == 'F') {
           finishLine.emplace_back(row, column);
-          cout << "FINISH LINE FOUND: " << row << column << "\n";
         }
       }
     }

@@ -4,6 +4,8 @@
 
 #include "Track.h"
 
+#include <vector>
+
 
 string Track::to_json(const vector<Coord>& path, const int height) {
 
@@ -11,8 +13,6 @@ string Track::to_json(const vector<Coord>& path, const int height) {
     string text = "";
     for (auto points : path) {
         const int invertedHeight = height - (points.row + 1);
-        cout <<"INVERTED HEIGHT: " << invertedHeight;
-        cout << "THE CURRENT POINT : " << points.row << points.col;
         text += to_string(points.col) + ", " + to_string(invertedHeight) + "\n";
     }
 

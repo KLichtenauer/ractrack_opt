@@ -3,6 +3,10 @@
 //
 
 #include "InitPathUtils.h"
+
+#include <deque>
+#include <iomanip>
+
 #include "Track.h"
 
 vector<Coord> InitPathUtils::initPath(Track &t) {
@@ -21,7 +25,6 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
         }
     }
 
-    cout << "\n Starting clearance evaluation.";
 
     while (!qClearance.empty() && qClearance.size() > 0) {
         Coord c = qClearance.front();
@@ -42,32 +45,25 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
         }
     }
 
-    cout << "\n Finished clearance.";
+    exportClearanceMap(clearance, t, "clearance.t");
+
 
 
     using State = pair<int, Coord>;
 
     vector<vector<State> > weightedGrid(t.height(), vector<State>(t.width(), {INT_MAX, Coord(0, 0)}));
-
     for (int c = 0; c < t.width(); c++) {
         for (int r = 0; r < t.height(); r++) {
             weightedGrid[r][c].second = Coord{r, c};
         }
     }
-
-
-    // Plan the shortest path with weighted map to avoid grass.
     const Coord start = t.start;
     weightedGrid[start.row][start.col].first = 0;
-
     deque<Coord> qPath;
     qPath.push_back(start);
-
     while (!qPath.empty() && qPath.size() > 0) {
         Coord c = qPath.front();
         qPath.pop_front();
-
-        // Only moves are up, down, left, right (nothing diagonal)
         for (auto [x, y]: {
                  pair<int, int>{c.row - 1, c.col},
                  pair<int, int>{c.row, c.col - 1},
@@ -76,15 +72,11 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
              }) {
 
             int K = 2;
-            int EXTRA_GRASS_COST = 4; // Costs for being in grass. (If move takes 5 normal tiles it chooses the grass path rather than the way around)
-            int base = 1; // Every move costs one
+            int EXTRA_GRASS_COST = 4;
+            int base = 1;
 
             if (x < 0 || y < 0 || x >= t.height() || y >= t.width()) continue;
-            // Continue if Finish, Obstacle or Start tile
             if (t.at(x, y) == 'O' || t.at(x, y) == 'S') continue;
-
-
-            // Else:
             const int currentCost = weightedGrid[c.row][c.col].first + K / (clearance[x][y] + 1) + base +
                               (t.at(x, y) == 'G'
                                    ? EXTRA_GRASS_COST
@@ -102,12 +94,11 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
         }
     }
 
-    cout << "Finished planing shortest path. \n";
+    exportWeightedGrid(weightedGrid, t, "weighted_grid.t");
 
-    // Extracting path. The final path:
+
+
     vector<Coord> path;
-
-    // Find the best solution from the finish line entries.
     vector<Coord> finishLine = t.finishLine;
     Coord bestFinishTile = finishLine.at(0);
     for (auto finishTile: finishLine) {
@@ -116,7 +107,6 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
         }
 
     }
-    // Track back with parents and put it in paths.
     bool arrivedStart = false;
     Coord currentCoord = bestFinishTile;
     path.push_back(bestFinishTile);
@@ -124,19 +114,44 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
     while (!arrivedStart) {
         Coord parent = weightedGrid[currentCoord.row][currentCoord.col].second;
         path.insert(path.begin(), parent);
-        // Stop when distance of point is 0 (starting point found).
         if (weightedGrid[parent.row][parent.col].first == 0 || (parent.row == start.row && parent.col == start.col)) {
-            cout << "\n Start found" << parent.row << "," << parent.col;
             arrivedStart = true;
         }
         currentCoord = parent;
     }
 
 
-    cout << "\n Minimum path found with size: " + to_string(path.size());
-
-
     return path;
 }
+
+void InitPathUtils::exportClearanceMap(const vector<vector<int>>& clearance, const Track& t, const string& filename) {
+    ofstream out(filename);
+    for (int r = 0; r < t.height(); ++r) {
+        for (int c = 0; c < t.width(); ++c) {
+            if (t.at(r, c) == 'G') out << " G ";
+            else if (t.at(r, c) == 'O') out << " O ";
+            else if (clearance[r][c] == INT_MAX) out << " . ";
+            else out << setw(2) << clearance[r][c] << " ";
+        }
+        out << "\n";
+    }
+    out.close();
+}
+
+void InitPathUtils::exportWeightedGrid(const vector<vector<pair<int, Coord>>>& grid, const Track& t, const string& filename) {
+    ofstream out(filename);
+    for (int r = 0; r < t.height(); ++r) {
+        for (int c = 0; c < t.width(); ++c) {
+            if (t.at(r, c) == 'O') out << " O ";
+            else if (t.at(r, c) == 'G') out << " G ";
+            else if (grid[r][c].first == INT_MAX) out << " . ";
+            else out << setw(2) << grid[r][c].first << " ";
+        }
+        out << "\n";
+    }
+    out.close();
+}
+
+
 
 
