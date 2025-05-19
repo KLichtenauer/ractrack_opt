@@ -8,6 +8,7 @@
 #include <deque>
 #include <iomanip>
 #include <queue>
+#include <random>
 #include <unordered_map>
 
 #include "Track.h"
@@ -26,7 +27,6 @@ static std::tuple<int,int,int,int> makeKey(const State &s) {
 struct TupleHash {
     std::size_t operator()(const std::tuple<int,int,int,int> &t) const noexcept {
         auto [r, c, vr, vc] = t;
-        // combine the four ints into one hash
         std::size_t h = std::hash<int>{}(r);
         h = h * 31 + std::hash<int>{}(c);
         h = h * 31 + std::hash<int>{}(vr);
@@ -41,6 +41,12 @@ struct TupleEqual {
         return a == b;
     }
 };
+
+static std::mt19937_64 RNG(std::random_device{}());
+static std::uniform_real_distribution<double> UNI(0.0, 1.0);
+
+static constexpr int    MAX_NEIGHBORS = 3;
+static constexpr double SKIP_PROB = 0.2;
 
 static std::vector<State> reconstructPath(
     const State &endState,
@@ -151,16 +157,28 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
         }
 
         bool onGrass = (t.at(cur.pos.row, cur.pos.col) == 'G');
-        int vFromX = std::abs(cur.vel.row);
-        int vFromY = std::abs(cur.vel.col);
+        int vx = cur.vel.row;
+        int vy = cur.vel.col;
+        int vFromX = std::abs(vx);
+        int vFromY = std::abs(vy);
 
         for (int ax = -1; ax <= 1; ++ax) {
+            int nxtVx = vx + ax;
+            if ((vx > 0 && nxtVx < 0) ||
+                (vx < 0 && nxtVx > 0))
+                continue;
+
             for (int ay = -1; ay <= 1; ++ay) {
-                int nextVelX = cur.vel.row + ax;
-                int nextVelY = cur.vel.col + ay;
-                int nextPosX = cur.pos.row + nextVelX;
-                int nextPosY = cur.pos.col + nextVelY;
-                State nxt{{nextPosX, nextPosY}, {nextVelX, nextVelY}};
+                int nxtVy = vy + ay;
+                if ((vy > 0 && nxtVy < 0) ||
+                    (vy < 0 && nxtVy > 0))
+                    continue;
+
+                State nxt;
+                nxt.vel.row = vx + ax;
+                nxt.vel.col = vy + ay;
+                nxt.pos.row = cur.pos.row + nxt.vel.row;
+                nxt.pos.col = cur.pos.col + nxt.vel.col;
                 if (nxt.pos.row < 0 || nxt.pos.col < 0 || nxt.pos.row >= t.height() || nxt.pos.col >= t.width()) continue;
                 if (!isPathClear(t, cur.pos, nxt.pos)) continue;
                 if (onGrass) {
