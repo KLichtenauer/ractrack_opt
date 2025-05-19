@@ -12,7 +12,12 @@ using namespace std;
 
 int main() {
     vector<string> inputFiles = {"track_02", "track_03", "track_04", "track_05", "track_06", "track_07", "track_08", "track_09", "track_10"};
-
+    struct Summary {
+        string name;
+        double time;
+        size_t steps;
+    };
+    vector<Summary> summaries;
     for (int i = 0; i < inputFiles.size(); i++) {
         string inputFile = inputFiles[i];
         string inputPath = "../data/programmingExercise/" + inputFile + ".t";
@@ -32,12 +37,21 @@ int main() {
             return 1;
         }
 
-        outFile << Track::to_json(initPath, t.height());
+        summaries.push_back({ inputFile, durationSeconds, initPath.size() });
 
-        cout << "Track: " << inputFile << ";\t duration: " << durationSeconds << ";\t steps:" << initPath.size() << endl;
+    }
 
-        outFile.close();
-
+    cout << "\n=== Track Summaries ===\n";
+    cout << left
+         << setw(12) << "Track"
+         << setw(12) << "Time (s)"
+         << setw(12) << "Steps"
+         << "\n";
+    for (auto &s : summaries) {
+        cout << setw(12) << s.name
+             << setw(12) << s.time
+             << setw(12) << s.steps - 1
+             << "\n";
     }
 
 
