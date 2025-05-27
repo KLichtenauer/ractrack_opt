@@ -30,7 +30,7 @@ int main() {
         vector<State> initPath = InitPathUtils::initPath(t);
 
         SimulatedAnnealer simulated_annealer(t, initPath);
-        vector<State> result = simulated_annealer.run(10000.0, 0.995, 0.01, 3000);
+        vector<State> result = simulated_annealer.run(10.0, 0.995, 0.01, 3000);
 
         auto t1 = chrono::high_resolution_clock::now();
         double durationSeconds = chrono::duration<double>(t1 - t0).count();

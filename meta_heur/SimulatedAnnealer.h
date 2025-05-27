@@ -29,11 +29,13 @@ private:
 
     static double computeCost(const std::vector<State>& path);
     std::vector<State> mutatePath(const std::vector<State>& path);
+
+    void tryTwoStepShortcut(std::vector<State> &p);
+
+    void tryThreeStepShortcut(std::vector<State> &p);
+
     bool isInside(const Coord& c) const;
     bool isPathClear(const Coord& from, const Coord& to) const;
-    void tryMultiShortcut(std::vector<State>& p);
-    void trySingleRemoval(std::vector<State>& p);
-    void tryRandomInsertion(std::vector<State>& p);
 };
 
 

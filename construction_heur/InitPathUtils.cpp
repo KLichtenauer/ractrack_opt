@@ -14,7 +14,7 @@
 
 #include "Track.h"
 
-static const int MAX_VELOCITY = 2;
+static const int MAX_VELOCITY = 4;
 
 static std::tuple<int,int,int,int> makeKey(const State &s) {
     return {s.pos.row, s.pos.col, s.vel.row, s.vel.col};
