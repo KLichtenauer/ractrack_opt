@@ -6,14 +6,16 @@
 
 #include <vector>
 
+#include "InitPathUtils.h"
 
-string Track::to_json(const vector<Coord>& path, const int height) {
+
+string Track::to_json(const vector<State>& path, const int height) {
 
     // Add points on track:
     string text = "";
     for (auto points : path) {
-        const int invertedHeight = height - (points.row + 1);
-        text += to_string(points.col) + ", " + to_string(invertedHeight) + "\n";
+        const int invertedHeight = height - (points.pos.row + 1);
+        text += to_string(points.pos.col) + ", " + to_string(invertedHeight) + "\n";
     }
 
     return text;

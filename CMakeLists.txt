@@ -11,4 +11,7 @@ add_executable(
         construction_heur/InitPathUtils.cpp
         construction_heur/InitPathUtils.h
         construction_heur/Track.cpp
-        construction_heur/Track.h)
+        construction_heur/Track.h
+        meta_heur/SimulatedAnnealer.cpp
+        meta_heur/SimulatedAnnealer.h
+        construction_heur/State.h)

@@ -10,19 +10,10 @@
 #include <iostream>
 #include <vector>
 
+#include "State.h"
+
 using namespace std;
 
-
-class Coord {
-public:
-  int row;
-  int col;
-
-  Coord(int r, int c)
-    : row(r),
-      col(c) {
-  }
-};
 
 
 class Step {
@@ -85,8 +76,7 @@ public:
     return rows[row][column];
   }
 
-  //static string to_json(const vector<Coord> &path, int height);
-  static string to_json(const vector<Coord>& path, const int height);
+  static string to_json(const vector<State> &path, int height);
 
 };
 
