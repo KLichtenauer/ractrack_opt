@@ -10,15 +10,11 @@
 #include <queue>
 #include <random>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "Track.h"
 
-struct State {
-    Coord pos;
-    Coord vel;
-    State() : pos(0,0), vel(0,0) {}
-    State(const Coord &p, const Coord &v) : pos(p), vel(v) {}
-};
+static const int MAX_VELOCITY = 1;
 
 static std::tuple<int,int,int,int> makeKey(const State &s) {
     return {s.pos.row, s.pos.col, s.vel.row, s.vel.col};
@@ -45,8 +41,6 @@ struct TupleEqual {
 static std::mt19937_64 RNG(std::random_device{}());
 static std::uniform_real_distribution<double> UNI(0.0, 1.0);
 
-static constexpr int    MAX_NEIGHBORS = 3;
-static constexpr double SKIP_PROB = 0.2;
 
 static std::vector<State> reconstructPath(
     const State &endState,
@@ -95,7 +89,6 @@ static bool isPathClear(const Track &t, const Coord &from, const Coord &to) {
     return true;
 }
 
-
 vector<vector<int> > createClearance(Track &t) {
     deque<Coord> qClearance;
     vector clearance(t.height(), vector<int>(t.width(), INT_MAX));
@@ -130,10 +123,19 @@ vector<vector<int> > createClearance(Track &t) {
     return clearance;
 }
 
-vector<Coord> InitPathUtils::initPath(Track &t) {
+vector<State> InitPathUtils::initPath(Track &t) {
     const Coord startPos = t.start;
     const State startState{startPos, Coord{0, 0}};
-    queue<State> q;
+
+    vector<vector<int>> clearance = createClearance(t);
+
+    auto cmp = [&](const State &a, const State &b) {
+        int ca = clearance[a.pos.row][a.pos.col];
+        int cb = clearance[b.pos.row][b.pos.col];
+        return ca < cb;
+    };
+
+    std::priority_queue<State, std::vector<State>, decltype(cmp)> q(cmp);
     std::unordered_map<std::tuple<int,int,int,int>, bool,       TupleHash, TupleEqual> visited;
     std::unordered_map<std::tuple<int,int,int,int>, State,      TupleHash, TupleEqual> parent;
 
@@ -144,7 +146,7 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
     bool found = false;
 
     while (!q.empty() && !found) {
-        State cur = q.front(); q.pop();
+        State cur = q.top(); q.pop();
         for (auto &f : t.finishLine) {
             if (cur.pos.row == f.row && cur.pos.col == f.col) {
                 goal = cur;
@@ -177,6 +179,8 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
                 State nxt;
                 nxt.vel.row = vx + ax;
                 nxt.vel.col = vy + ay;
+                int speedSquared = nxt.vel.row * nxt.vel.row + nxt.vel.col * nxt.vel.col;
+                if (speedSquared > MAX_VELOCITY * MAX_VELOCITY) continue;
                 nxt.pos.row = cur.pos.row + nxt.vel.row;
                 nxt.pos.col = cur.pos.col + nxt.vel.col;
                 if (nxt.pos.row < 0 || nxt.pos.col < 0 || nxt.pos.row >= t.height() || nxt.pos.col >= t.width()) continue;
@@ -204,7 +208,7 @@ vector<Coord> InitPathUtils::initPath(Track &t) {
         return {};
     }
     auto statePath = reconstructPath(goal, parent);
-    vector<Coord> path;
-    for (auto &s : statePath) path.push_back(s.pos);
-    return path;
+    return statePath;
 }
+
+

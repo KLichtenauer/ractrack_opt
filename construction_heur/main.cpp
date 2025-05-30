@@ -8,6 +8,7 @@
 
 #include "Track.h"
 #include "InitPathUtils.h"
+#include "../meta_heur/SimulatedAnnealer.h"
 using namespace std;
 
 int main() {
@@ -26,7 +27,11 @@ int main() {
         Track t;
         if (!t.load(inputPath)) return 1;
 
-        vector<Coord> initPath= InitPathUtils::initPath(t);
+        vector<State> initPath = InitPathUtils::initPath(t);
+
+        SimulatedAnnealer simulated_annealer(t, initPath);
+        vector<State> result = simulated_annealer.run(1000.0, 0.995, 0.01, 3000);
+
         auto t1 = chrono::high_resolution_clock::now();
         double durationSeconds = chrono::duration<double>(t1 - t0).count();
 
@@ -37,7 +42,22 @@ int main() {
             return 1;
         }
 
-        summaries.push_back({ inputFile, durationSeconds, initPath.size() });
+
+        summaries.push_back({ inputFile, durationSeconds, result.size() });
+
+        outFile << Track::to_json(result, t.height());
+        outFile.close();
+        string trackFilePath = "programmingExercise/" + inputFile + ".t";
+        string tripFilePath = shortestPathOutputFilePath;
+        string outputFilePath = "outputs/" + inputFile;
+        string visCmd   = "perl ../data/visualise.pl ../data/programmingExercise/"
+                        + inputFile + ".t "
+                        + tripFilePath + " ../data/outputs/" + inputFile;
+        system(visCmd.c_str());
+
+        string pdfLatexCmd = "cd .. && cd data && pdflatex " +  outputFilePath;
+        system(pdfLatexCmd.c_str());
+
 
     }
 
