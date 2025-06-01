@@ -15,7 +15,7 @@
 
 #include "Track.h"
 
-static const int MAX_VELOCITY = 1;
+static const int MAX_VELOCITY = 20;
 
 static std::tuple<int,int,int,int> makeKey(const State &s) {
     return {s.pos.row, s.pos.col, s.vel.row, s.vel.col};
@@ -153,7 +153,7 @@ static vector<vector<int>> createFinishDist(const Track &t) {
 vector<State> InitPathUtils::initPath(Track &t) {
     const Coord startPos = t.start;
     const State startState{startPos, Coord{0, 0}};
-
+/*
     int H = t.height(), W = t.width();
     auto clearance = createClearance(t);
     auto finishDist = createFinishDist(t);
@@ -183,7 +183,8 @@ vector<State> InitPathUtils::initPath(Track &t) {
         return score[a.pos.row][a.pos.col]
              < score[b.pos.row][b.pos.col];
     };
-    std::priority_queue<State, std::vector<State>, decltype(cmp)> q(cmp);
+    */
+    queue<State> q;
     std::unordered_map<std::tuple<int,int,int,int>, bool,       TupleHash, TupleEqual> visited;
     std::unordered_map<std::tuple<int,int,int,int>, State,      TupleHash, TupleEqual> parent;
 
@@ -194,7 +195,7 @@ vector<State> InitPathUtils::initPath(Track &t) {
     bool found = false;
 
     while (!q.empty() && !found) {
-        State cur = q.top(); q.pop();
+        State cur = q.front(); q.pop();
         for (auto &f : t.finishLine) {
             if (cur.pos.row == f.row && cur.pos.col == f.col) {
                 goal = cur;

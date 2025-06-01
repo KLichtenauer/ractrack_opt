@@ -27,10 +27,10 @@ int main() {
         Track t;
         if (!t.load(inputPath)) return 1;
 
-        vector<State> initPath = InitPathUtils::initPath(t);
+        vector<State> result = InitPathUtils::initPath(t);
 
-        SimulatedAnnealer simulated_annealer(t, initPath);
-        vector<State> result = simulated_annealer.run(10000, 0.995, 0.01);
+        //SimulatedAnnealer simulated_annealer(t, initPath);
+        //vector<State> result = simulated_annealer.run(10000, 0.995, 0.01);
 
         auto t1 = chrono::high_resolution_clock::now();
         double durationSeconds = chrono::duration<double>(t1 - t0).count();
