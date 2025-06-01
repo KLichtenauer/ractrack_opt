@@ -70,6 +70,7 @@ std::vector<State> SimulatedAnnealer::mutatePath(const std::vector<State>& path)
         case 0: tryTwoStepShortcut(p);    break;
         case 1: tryThreeStepShortcut(p);    break;
         //case 2: tryInsertStep(p) break; NOT WORKING AS EXPECTED
+        case 2: tryAccelDecelStraight(p); break;
     }
 
     return p;
@@ -187,7 +188,125 @@ void SimulatedAnnealer::tryInsertStep(std::vector<State>& p) {
     }
 }
 
-std::vector<State> SimulatedAnnealer::run(double startTemp, double coolingRate, double minTemp, int maxIters) {
+void SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
+    int n = (int)p.size();
+    if (n < 3) return;
+
+    struct Seg { int start, end; Coord dir; };
+    std::vector<Seg> segs;
+
+    for (int i = 0; i + 2 < n; ++i) {
+        Coord d1{ p[i+1].pos.row - p[i].pos.row,
+                  p[i+1].pos.col - p[i].pos.col };
+        if (!d1.row && !d1.col) continue;
+
+        int end = i + 1;
+        while (end + 1 < n) {
+            Coord d2{ p[end+1].pos.row - p[end].pos.row,
+                      p[end+1].pos.col - p[end].pos.col };
+            if (d2.row != d1.row || d2.col != d1.col) break;
+            ++end;
+        }
+        if (end - i >= 4) {
+            segs.push_back({ i, end, d1 });
+            i = end - 1;  // skip ahead
+        }
+    }
+
+     if (segs.empty()) return;
+
+    std::uniform_int_distribution<int> distSeg(0, (int)segs.size() - 1);
+    Seg chosen = segs[ distSeg(rng) ];
+    int s = chosen.start;
+    int e = chosen.end;
+
+    int Lorig = e - s;
+    if (Lorig < 1) return;
+
+    if (Lorig % 2 == 1) {
+        --e;
+        --Lorig;
+        if (Lorig < 1) return;
+    }
+
+    State startSt = p[s];
+    State endSt   = p[e];
+
+    Coord du {
+        chosen.dir.row > 0 ?  1 : (chosen.dir.row < 0 ? -1 : 0),
+        chosen.dir.col > 0 ?  1 : (chosen.dir.col < 0 ? -1 : 0)
+    };
+
+    std::vector<int> speeds;
+    int rem = Lorig;
+    int curr = 1;
+
+    while (true) {
+        int sumDown = (curr - 1) * curr / 2;
+        if (rem - curr - 1 >= sumDown) {
+            speeds.push_back(curr);
+            rem -= curr;
+            curr++;
+        }
+        else {
+            break;
+        }
+    }
+
+    int h = curr - 1;
+    if (h < 1) return;
+
+
+    for (int d = h-1; d >= 1 && rem > 0; --d) {
+        if (rem >= d) {
+            speeds.push_back(d);
+            rem -= d;
+        }
+    }
+
+    while (rem > 0) {
+        speeds.push_back(1);
+        rem -= 1;
+    }
+
+    if (rem != 0) {
+        return;
+    }
+
+    int N = (int)speeds.size();
+    std::vector<State> mini;
+    mini.push_back(startSt);
+
+    for (int i = 0; i < N; ++i) {
+        int sp = speeds[i];
+        Coord vel{ du.row * sp, du.col * sp };
+
+        State nxt;
+        nxt.pos = {
+            mini.back().pos.row + vel.row,
+            mini.back().pos.col + vel.col
+        };
+        nxt.vel = vel;
+
+        State &prev = mini.back();
+        if (t.at(prev.pos.row, prev.pos.col) == 'G' &&
+            violatesGrassRule(prev.vel, vel)) {
+            return;
+        }
+        mini.push_back(nxt);
+    }
+
+    if (mini.back().pos.col != endSt.pos.col || mini.back().pos.row != endSt.pos.row || mini.back().vel.col != du.col || mini.back().vel.row != du.row) {
+        return;
+    }
+    p.erase(p.begin() + s + 1, p.begin() + e);
+    p.insert(p.begin() + s + 1,
+             mini.begin() + 1,
+             mini.end()   - 1);
+
+}
+
+std::vector<State> SimulatedAnnealer::run(double startTemp, double coolingRate, double minTemp) {
     auto best = currentPath;
     double bestCost = computeCost(currentPath);
     double temp = startTemp;
@@ -210,9 +329,5 @@ std::vector<State> SimulatedAnnealer::run(double startTemp, double coolingRate, 
         temp *= coolingRate;
     }
 
-    std::cout << "Operator usage:\n"
-            << "  two step:   " << opCounts[0] << "\n"
-            << "  insert:   " << opCounts[1] << "\n"
-            << "  three step:   " << opCounts[2] << "\n";
     return best;
 }

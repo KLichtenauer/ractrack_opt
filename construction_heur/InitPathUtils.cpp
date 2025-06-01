@@ -5,6 +5,7 @@
 #include "InitPathUtils.h"
 
 #include <algorithm>
+#include <array>
 #include <deque>
 #include <iomanip>
 #include <queue>
@@ -123,18 +124,65 @@ vector<vector<int> > createClearance(Track &t) {
     return clearance;
 }
 
+static vector<vector<int>> createFinishDist(const Track &t) {
+    int H = t.height(), W = t.width();
+    vector<vector<int>> dist(H, vector<int>(W, INT_MAX));
+    deque<Coord> dq;
+    for (auto &f : t.finishLine) {
+        dist[f.row][f.col] = 0;
+        dq.push_back(f);
+    }
+    static const array<pair<int,int>,4> dirs = {{
+        {-1,0},{1,0},{0,-1},{0,1}
+    }};
+    while (!dq.empty()) {
+        auto c = dq.front(); dq.pop_front();
+        int d = dist[c.row][c.col];
+        for (auto &Δ : dirs) {
+            int nr = c.row + Δ.first, nc = c.col + Δ.second;
+            if (nr < 0 || nc < 0 || nr >= H || nc >= W) continue;
+            if (t.at(nr,nc) == 'O') continue;         // obstacle
+            if (dist[nr][nc] <= d + 1) continue;
+            dist[nr][nc] = d + 1;
+            dq.emplace_back(nr, nc);
+        }
+    }
+    return dist;
+}
+
 vector<State> InitPathUtils::initPath(Track &t) {
     const Coord startPos = t.start;
     const State startState{startPos, Coord{0, 0}};
 
-    vector<vector<int>> clearance = createClearance(t);
+    int H = t.height(), W = t.width();
+    auto clearance = createClearance(t);
+    auto finishDist = createFinishDist(t);
 
-    auto cmp = [&](const State &a, const State &b) {
-        int ca = clearance[a.pos.row][a.pos.col];
-        int cb = clearance[b.pos.row][b.pos.col];
-        return ca < cb;
+    double maxC = 0, maxD = 0;
+    for (int r = 0; r < H; ++r) {
+        for (int c = 0; c < W; ++c) {
+            if (clearance[r][c] < INT_MAX) {
+                maxC = max(maxC, (double)clearance[r][c]);
+            }
+            if (finishDist[r][c] < INT_MAX)
+                maxD = max(maxD, (double)finishDist[r][c]);
+        }
+    }
+
+    const double α = 0.7;
+    vector<vector<double>> score(H, vector<double>(W, 0.0));
+    for (int r = 0; r < H; ++r) {
+        for (int c = 0; c < W; ++c) {
+            double cNorm = clearance[r][c] / maxC;       // 0…1
+            double dNorm = finishDist[r][c] / maxD;      // 0…1
+            score[r][c] = α * cNorm + (1-α) * (1.0 - dNorm);
+        }
+    }
+
+    auto cmp = [&](auto &a, auto &b) {
+        return score[a.pos.row][a.pos.col]
+             < score[b.pos.row][b.pos.col];
     };
-
     std::priority_queue<State, std::vector<State>, decltype(cmp)> q(cmp);
     std::unordered_map<std::tuple<int,int,int,int>, bool,       TupleHash, TupleEqual> visited;
     std::unordered_map<std::tuple<int,int,int,int>, State,      TupleHash, TupleEqual> parent;
