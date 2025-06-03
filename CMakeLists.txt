@@ -14,4 +14,8 @@ add_executable(
         construction_heur/Track.h
         meta_heur/SimulatedAnnealer.cpp
         meta_heur/SimulatedAnnealer.h
-        construction_heur/State.h)
+        construction_heur/State.h
+        meta_heur/GeneticOptimizer.cpp
+        meta_heur/GeneticOptimizer.h
+        meta_heur/Utils.cpp
+        meta_heur/Utils.h)

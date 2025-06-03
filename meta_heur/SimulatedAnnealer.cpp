@@ -65,91 +65,151 @@ double SimulatedAnnealer::computeCost(const std::vector<State>& path) {
 
 std::vector<State> SimulatedAnnealer::mutatePath(const std::vector<State>& path) {
     std::vector<State> p = path;
-    lastOp = std::uniform_int_distribution<int>{0,2}(rng);
+    lastOp = std::uniform_int_distribution<int>{0,4}(rng);
     switch (lastOp) {
         case 0: tryTwoStepShortcut(p);    break;
         case 1: tryThreeStepShortcut(p);    break;
         //case 2: tryInsertStep(p) break; NOT WORKING AS EXPECTED
         case 2: tryAccelDecelStraight(p); break;
+        case 3: tryLongShortcut(p); break;
+        case 4: tryDiagonalCorner(p); break;
     }
 
     return p;
 }
 
 // if p[i]→p[i+2] is legal, delete p[i+1]
-void SimulatedAnnealer::tryTwoStepShortcut(vector<State>& p) {
+void SimulatedAnnealer::tryTwoStepShortcut(std::vector<State>& p) {
     if (p.size() < 3) return;
-    int i = uniform_int_distribution<int>{0,int(p.size())-3}(rng);
+    int i = std::uniform_int_distribution<int>{0, int(p.size()) - 3}(rng);
 
-    State &A = p[i], &B = p[i+1], &C = p[i+2];
-    Coord jump = { C.pos.row - A.pos.row, C.pos.col - A.pos.col };
-    if (abs(jump.row - A.vel.row) > 1 || abs(jump.col - A.vel.col) > 1) return;
-    if ((A.vel.row>0 && jump.row<0) ||
-        (A.vel.row<0 && jump.row>0) ||
-        (A.vel.col>0 && jump.col<0) ||
-        (A.vel.col<0 && jump.col>0)) return;
+    State &A = p[i], &B = p[i + 1], &C = p[i + 2];
+    Coord jump{ C.pos.row - A.pos.row, C.pos.col - A.pos.col };
+
+    // Check direct jump A -> C
+    if (!legalJump(A.vel, jump)) return;
     if (!isPathClear(A.pos, C.pos)) return;
-    if (t.at(A.pos.row, A.pos.col)=='G' && violatesGrassRule(A.vel, jump)) return;
+    if (t.at(A.pos.row, A.pos.col) == 'G' && violatesGrassRule(A.vel, jump)) return;
 
-    State Bcopy = B; State Ccopy = C;
-    p.erase(p.begin() + i + 1);
-    p[i + 1].vel = jump;
+    // Backup middle node (B)
+    std::vector<State> backup{B};
 
-    if (i+2 < p.size()) {
-        const State& from   = p[i+1];
-        const Coord& target = p[i+2].pos;
-        Coord neededVel = { target.row - from.pos.row, target.col - from.pos.col };
+    // Simulate new state at C
+    State newC = C;
+    newC.vel = jump;
 
-        bool ok = true;
-        if (!legalJump(from.vel, neededVel)) {ok = false;}
-        else if (!isPathClear(from.pos, target)) {ok = false;}
-        else if (t.at(from.pos.row, from.pos.col)=='G' && violatesGrassRule(from.vel, neededVel)) {ok = false;}
+    // Check A' -> A
+    bool ok = true;
+    if (i - 1 >= 0) {
+        const State& prev = p[i - 1];
+        Coord toA{ A.pos.row - prev.pos.row, A.pos.col - prev.pos.col };
+        if (!legalJump(prev.vel, toA) || !isPathClear(prev.pos, A.pos))
+            ok = false;
+        if (t.at(prev.pos.row, prev.pos.col) == 'G' && violatesGrassRule(prev.vel, toA))
+            ok = false;
+    }
 
-        if (!ok) {
-            p.insert(p.begin() + i + 1, Bcopy);
-            p[i + 2] = Ccopy;
+    // Check newC -> p[i+3] if it exists
+    if (ok && i + 3 < (int)p.size()) {
+        const Coord& nextPos = p[i + 3].pos;
+        Coord toNext{ nextPos.row - C.pos.row, nextPos.col - C.pos.col };
+        if (!legalJump(jump, toNext) || !isPathClear(C.pos, nextPos))
+            ok = false;
+        if (t.at(C.pos.row, C.pos.col) == 'G' && violatesGrassRule(jump, toNext))
+            ok = false;
+    }
+
+    if (!ok) return;
+
+    // Commit change
+    p.erase(p.begin() + i + 1);       // remove B
+    p[i + 1].vel = jump;              // new velocity at C
+}
+
+void SimulatedAnnealer::tryDiagonalCorner(std::vector<State>& p)
+{
+    if (p.size() < 3) return;
+    int i = std::uniform_int_distribution<int>{1, (int)p.size()-2}(rng);
+
+    const State& A = p[i-1];
+    const State& B = p[i];
+    const State& C = p[i+1];
+
+    Coord d1{B.pos.row-A.pos.row, B.pos.col-A.pos.col};
+    Coord d2{C.pos.row-B.pos.row, C.pos.col-B.pos.col};
+    if ( (d1.row==0 && d2.col==0) || (d1.col==0 && d2.row==0) ) {
+        Coord diag{ d1.row+d2.row, d1.col+d2.col };
+        Coord midPos{ A.pos.row+diag.row, A.pos.col+diag.col };
+
+        if ( isInside(midPos)
+          && isPathClear(A.pos, midPos)
+          && isPathClear(midPos, C.pos) )
+        {
+            // legal?  check velocity constraints
+            if ( legalJump(A.vel, diag)
+              && legalJump(diag, C.vel)
+              && !( t.at(A.pos.row,A.pos.col)=='G'
+                    && violatesGrassRule(A.vel, diag) ) )
+            {
+                State S{ midPos, diag };
+                p[i] = S;                 // overwrite B by diagonal step
+            }
         }
     }
 }
 
+
 // if p[i]→p[i+3] is legal, delete p[i+1] and p[i+2]
 void SimulatedAnnealer::tryThreeStepShortcut(std::vector<State>& p) {
     if (p.size() < 4) return;
-    int i = std::uniform_int_distribution<int>{0, int(p.size()) - 4}(rng);
-    State &A = p[i], &B = p[i + 1], &C = p[i + 2], &D = p[i + 3];
-    Coord jump = { D.pos.row - A.pos.row,
-                   D.pos.col - A.pos.col };
 
-    if (std::abs(jump.row - A.vel.row) > 1 || std::abs(jump.col - A.vel.col) > 1) return;
+    int i = std::uniform_int_distribution<int>{0, (int)p.size() - 4}(rng);
 
-    if ((A.vel.row > 0 && jump.row < 0) ||
-        (A.vel.row < 0 && jump.row > 0) ||
-        (A.vel.col > 0 && jump.col < 0) ||
-        (A.vel.col < 0 && jump.col > 0))
-        return;
+    State& A = p[i];
+    State& B = p[i + 1];
+    State& C = p[i + 2];
+    State& D = p[i + 3];
 
+    Coord jump{ D.pos.row - A.pos.row, D.pos.col - A.pos.col };
+
+    if (!legalJump(A.vel, jump)) return;
     if (!isPathClear(A.pos, D.pos)) return;
     if (t.at(A.pos.row, A.pos.col) == 'G' && violatesGrassRule(A.vel, jump)) return;
 
-    State Bcopy = B, Ccopy = C, Dcopy = D;
+    std::vector<State> backup{ B, C };
 
-    p.erase(p.begin() + i + 1, p.begin() + i + 3);
-    p[i + 1].vel = jump;
+    State newD = D;
+    newD.vel = jump;
 
-    if (i + 2 < p.size()) {
-        const State& from   = p[i + 1];
-        const Coord& target = p[i + 2].pos;
-        Coord neededVel = { target.row - from.pos.row, target.col - from.pos.col };
+    bool ok = true;
+    if (i - 1 >= 0) {
+        const State& prev = p[i - 1];
+        Coord toA{ A.pos.row - prev.pos.row, A.pos.col - prev.pos.col };
 
-        bool ok = true;
-        if (!legalJump(from.vel, neededVel)) {ok = false;}
-        else if (!isPathClear(from.pos, target)) {ok = false;}
-        else if (t.at(from.pos.row, from.pos.col) == 'G' && violatesGrassRule(from.vel, neededVel)) {ok = false;}
+        if (!legalJump(prev.vel, toA) || !isPathClear(prev.pos, A.pos))
+            ok = false;
+        if (t.at(prev.pos.row, prev.pos.col) == 'G' &&
+            violatesGrassRule(prev.vel, toA))
+            ok = false;
+    }
 
-        if (!ok) {
-            p.insert(p.begin() + i + 1, { Bcopy, Ccopy });
-            p[i + 3] = Dcopy;
-        }
+    if (ok && i + 4 < (int)p.size()) {
+        const State& E = p[i + 4];
+        Coord toE{ E.pos.row - D.pos.row, E.pos.col - D.pos.col };
+
+        if (!legalJump(jump, toE) || !isPathClear(D.pos, E.pos))
+            ok = false;
+        if (t.at(D.pos.row, D.pos.col) == 'G' &&
+            violatesGrassRule(jump, toE))
+            ok = false;
+    }
+
+    if (ok) {
+        p.erase(p.begin() + i + 1, p.begin() + i + 3); // remove B, C
+        p[i + 1].vel = jump;                           // update D
+    } else {
+        // rollback: leave p unchanged
+        // (do nothing — shortcut is aborted)
     }
 }
 
@@ -188,6 +248,68 @@ void SimulatedAnnealer::tryInsertStep(std::vector<State>& p) {
     }
 }
 
+void SimulatedAnnealer::tryLongShortcut(std::vector<State>& p)
+{
+    if (p.size() < 4) return;
+
+    int i = std::uniform_int_distribution<int>{0, (int)p.size() - 4}(rng);
+    int maxSkip = std::min(10, (int)p.size() - i - 2);
+
+    for (int k = maxSkip; k >= 2; --k) {
+        State &A = p[i];
+        State &B = p[i + k + 1];
+
+        Coord jump{ B.pos.row - A.pos.row,
+                    B.pos.col - A.pos.col };
+
+        if (!legalJump(A.vel, jump)) continue;
+        if (!isPathClear(A.pos, B.pos))  continue;
+        if (t.at(A.pos.row, A.pos.col) == 'G' &&
+            violatesGrassRule(A.vel, jump)) continue;
+
+        std::vector<State> backup(p.begin() + i + 1, p.begin() + i + k + 1);
+
+        p.erase(p.begin() + i + 1, p.begin() + i + k + 1);
+        p[i + 1].vel = jump;
+
+        bool ok = true;
+        if (i - 1 >= 0) {
+            const State& prev = p[i - 1];
+            const State& from = p[i];
+            Coord needVel{ from.pos.row - prev.pos.row,
+                           from.pos.col - prev.pos.col };
+
+            ok =  legalJump(prev.vel, needVel)
+               && isPathClear(prev.pos, from.pos)
+               && !(t.at(prev.pos.row, prev.pos.col) == 'G' &&
+                    violatesGrassRule(prev.vel, needVel));
+        }
+
+        if (ok && i + 2 < (int)p.size()) {
+            const State& from   = p[i + 1];
+            const State& target = p[i + 2];
+            Coord needVel{ target.pos.row - from.pos.row,
+                           target.pos.col - from.pos.col };
+
+            ok =  legalJump(from.vel, needVel)
+               && isPathClear(from.pos, target.pos)
+               && !(t.at(from.pos.row, from.pos.col) == 'G' &&
+                    violatesGrassRule(from.vel, needVel));
+
+
+        }
+
+        if (!ok) {
+            p.erase(p.begin() + i + 1, p.begin() + i + 2);
+            p.insert(p.begin() + i + 1,
+                     backup.begin(), backup.end());
+        }
+
+        break;
+    }
+}
+
+
 void SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
     int n = (int)p.size();
     if (n < 3) return;
@@ -220,7 +342,11 @@ void SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
     int s = chosen.start;
     int e = chosen.end;
 
-    int Lorig = e - s;
+    int Lorig = 0;
+    for (int j = s; j < e; ++j)
+        Lorig += std::abs(p[j+1].pos.row - p[j].pos.row)
+               + std::abs(p[j+1].pos.col - p[j].pos.col); // manhattan lengths
+
     if (Lorig < 1) return;
 
     if (Lorig % 2 == 1) {
@@ -237,41 +363,43 @@ void SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
         chosen.dir.col > 0 ?  1 : (chosen.dir.col < 0 ? -1 : 0)
     };
 
+    // std::vector<int> speeds;
+    // int rem = Lorig;
+    // int curr = 1;
+    //
+    // while (true) {
+    //     int sumDown = (curr - 1) * curr / 2;
+    //     if (rem - curr - 1 >= sumDown) {
+    //         speeds.push_back(curr);
+    //         rem -= curr;
+    //         curr++;
+    //     }
+    //     else {
+    //         break;
+    //     }
+    // }
+
+    int h = (int)std::floor(std::sqrt(Lorig));
+    while ( (h+1)*(h+1) <= Lorig ) ++h;
+
+    int baseDist   = h * h;
+    int plateauLen = (Lorig - baseDist) / h;
+    int tail       =  Lorig - baseDist - plateauLen * h;  // 0 ≤ tail < h
+
+    // 2.  build the speed profile
     std::vector<int> speeds;
-    int rem = Lorig;
-    int curr = 1;
+    for (int v = 1; v <= h; ++v) speeds.push_back(v);
+    for (int i = 0; i < plateauLen; ++i) speeds.push_back(h);
+    for (int v = h-1; v >= 1; --v) speeds.push_back(v);
+    if (tail) speeds.push_back(tail);
 
-    while (true) {
-        int sumDown = (curr - 1) * curr / 2;
-        if (rem - curr - 1 >= sumDown) {
-            speeds.push_back(curr);
-            rem -= curr;
-            curr++;
-        }
-        else {
-            break;
-        }
-    }
-
-    int h = curr - 1;
-    if (h < 1) return;
+    //while (rem > 0) {speeds.push_back(1); rem -= 1;}
+    //while (rem > 0) { speeds.push_back(h); rem -= h; }
 
 
-    for (int d = h-1; d >= 1 && rem > 0; --d) {
-        if (rem >= d) {
-            speeds.push_back(d);
-            rem -= d;
-        }
-    }
-
-    while (rem > 0) {
-        speeds.push_back(1);
-        rem -= 1;
-    }
-
-    if (rem != 0) {
-        return;
-    }
+    // if (rem != 0) {
+    //     return;
+    // }
 
     int N = (int)speeds.size();
     std::vector<State> mini;
@@ -296,7 +424,12 @@ void SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
         mini.push_back(nxt);
     }
 
-    if (mini.back().pos.col != endSt.pos.col || mini.back().pos.row != endSt.pos.row || mini.back().vel.col != du.col || mini.back().vel.row != du.row) {
+
+    if (mini.back().pos.col != endSt.pos.col||
+        mini.back().pos.row != endSt.pos.row
+        // mini.back().vel.col != du.col ||
+        //  mini.back().vel.row != du.row
+        ) {
         return;
     }
     p.erase(p.begin() + s + 1, p.begin() + e);

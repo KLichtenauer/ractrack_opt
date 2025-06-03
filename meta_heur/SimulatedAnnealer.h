@@ -19,7 +19,7 @@ public:
 
     std::vector<State> run(double startTemp = 10.0, double coolingRate = 0.99, double minTemp = 0.1);
 
-private:
+public:
     const Track& t;
     std::vector<State> currentPath;
     std::mt19937_64 rng;
@@ -31,8 +31,14 @@ private:
     std::vector<State> mutatePath(const std::vector<State>& path);
 
     void tryTwoStepShortcut(std::vector<State> &p);
+
+    void tryDiagonalCorner(std::vector<State> &p);
+
     void tryThreeStepShortcut(std::vector<State> &p);
     void tryInsertStep(std::vector<State> &p);
+
+    void tryLongShortcut(std::vector<State> &p);
+
     void tryAccelDecelStraight(std::vector<State> &p);
 
     bool isInside(const Coord& c) const;
