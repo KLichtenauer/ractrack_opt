@@ -27,10 +27,10 @@ int main() {
         Track t;
         if (!t.load(inputPath)) return 1;
 
-        vector<State> result = InitPathUtils::initPath(t);
+        vector<State> initPath = InitPathUtils::initPath(t);
 
-        //SimulatedAnnealer simulated_annealer(t, initPath);
-        //vector<State> result = simulated_annealer.run(10000, 0.995, 0.01);
+        SimulatedAnnealer simulated_annealer(t, initPath);
+        vector<State> result = simulated_annealer.run(10000, 0.995, 0.01);
 
         auto t1 = chrono::high_resolution_clock::now();
         double durationSeconds = chrono::duration<double>(t1 - t0).count();
@@ -44,7 +44,7 @@ int main() {
 
 
         summaries.push_back({ inputFile, durationSeconds, result.size() });
-/*
+
         outFile << Track::to_json(result, t.height());
         outFile.close();
         string trackFilePath = "programmingExercise/" + inputFile + ".t";
@@ -57,7 +57,7 @@ int main() {
 
         string pdfLatexCmd = "cd .. && cd data && pdflatex "+  outputFilePath;
         system(pdfLatexCmd.c_str());
-*/
+
 
     }
 

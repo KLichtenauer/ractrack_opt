@@ -188,125 +188,172 @@ void SimulatedAnnealer::tryInsertStep(std::vector<State>& p) {
     }
 }
 
-void SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
+vector<State> SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
     int n = (int)p.size();
-    if (n < 3) return;
+    if (n < 3) return p;
 
-    struct Seg { int start, end; Coord dir; };
-    std::vector<Seg> segs;
-
-    for (int i = 0; i + 2 < n; ++i) {
-        Coord d1{ p[i+1].pos.row - p[i].pos.row,
-                  p[i+1].pos.col - p[i].pos.col };
-        if (!d1.row && !d1.col) continue;
-
-        int end = i + 1;
-        while (end + 1 < n) {
-            Coord d2{ p[end+1].pos.row - p[end].pos.row,
-                      p[end+1].pos.col - p[end].pos.col };
-            if (d2.row != d1.row || d2.col != d1.col) break;
-            ++end;
-        }
-        if (end - i >= 4) {
-            segs.push_back({ i, end, d1 });
-            i = end - 1;  // skip ahead
-        }
-    }
-
-     if (segs.empty()) return;
-
-    std::uniform_int_distribution<int> distSeg(0, (int)segs.size() - 1);
-    Seg chosen = segs[ distSeg(rng) ];
-    int s = chosen.start;
-    int e = chosen.end;
-
-    int Lorig = e - s;
-    if (Lorig < 1) return;
-
-    if (Lorig % 2 == 1) {
-        --e;
-        --Lorig;
-        if (Lorig < 1) return;
-    }
-
-    State startSt = p[s];
-    State endSt   = p[e];
-
-    Coord du {
-        chosen.dir.row > 0 ?  1 : (chosen.dir.row < 0 ? -1 : 0),
-        chosen.dir.col > 0 ?  1 : (chosen.dir.col < 0 ? -1 : 0)
-    };
-
-    std::vector<int> speeds;
-    int rem = Lorig;
-    int curr = 1;
-
-    while (true) {
-        int sumDown = (curr - 1) * curr / 2;
-        if (rem - curr - 1 >= sumDown) {
-            speeds.push_back(curr);
-            rem -= curr;
-            curr++;
-        }
-        else {
-            break;
-        }
-    }
-
-    int h = curr - 1;
-    if (h < 1) return;
-
-
-    for (int d = h-1; d >= 1 && rem > 0; --d) {
-        if (rem >= d) {
-            speeds.push_back(d);
-            rem -= d;
-        }
-    }
-
-    while (rem > 0) {
-        speeds.push_back(1);
-        rem -= 1;
-    }
-
-    if (rem != 0) {
-        return;
-    }
-
-    int N = (int)speeds.size();
-    std::vector<State> mini;
-    mini.push_back(startSt);
-
-    for (int i = 0; i < N; ++i) {
-        int sp = speeds[i];
-        Coord vel{ du.row * sp, du.col * sp };
-
-        State nxt;
-        nxt.pos = {
-            mini.back().pos.row + vel.row,
-            mini.back().pos.col + vel.col
+    // idx is our current scan position in p
+    int idx = 0;
+    while (idx + 2 < (int)p.size()) {
+        // 1) Compute the “direction” from p[idx] → p[idx+1]
+        Coord d1{
+            p[idx+1].pos.row - p[idx].pos.row,
+            p[idx+1].pos.col - p[idx].pos.col
         };
-        nxt.vel = vel;
-
-        State &prev = mini.back();
-        if (t.at(prev.pos.row, prev.pos.col) == 'G' &&
-            violatesGrassRule(prev.vel, vel)) {
-            return;
+        if (d1.row == 0 && d1.col == 0) {
+            // no motion, skip forward
+            ++idx;
+            continue;
         }
-        mini.push_back(nxt);
+
+        // 2) Find how far this same direction continues
+        int endIdx = idx + 1;
+        while (endIdx + 1 < (int)p.size()) {
+            Coord d2{
+                p[endIdx+1].pos.row - p[endIdx].pos.row,
+                p[endIdx+1].pos.col - p[endIdx].pos.col
+            };
+            if (d2.row != d1.row || d2.col != d1.col) break;
+            ++endIdx;
+        }
+
+        int runLength = endIdx - idx;  // number of steps in this straight run
+        if (runLength < 3) {
+            // too short to splice; move on
+            idx++;
+            continue;
+        }
+
+        // 3) We have a candidate run from idx ... endIdx (inclusive)
+        //    Let s = idx, e = endIdx. We will try to build an “accel‐decel” mini‐path of exactly runLength steps.
+        int s = idx;
+        int e = endIdx;
+        int Lorig = e - s;          // number of “steps” between p[s] and p[e]
+
+        // If Lorig is odd, drop the last step so we have an even count
+        if (Lorig % 2 == 1) {
+            --e;
+            --Lorig;
+            if (Lorig < 1) {
+                idx++;
+                continue;
+            }
+        }
+
+        State startSt = p[s];
+        State endSt   = p[e];
+
+        // 4) Compute a unit “du” so that each new velocity is along the same straight direction
+        Coord du{
+            d1.row >  0 ?  1 : (d1.row <  0 ? -1 : 0),
+            d1.col >  0 ?  1 : (d1.col <  0 ? -1 : 0)
+        };
+
+        // 5) Build a speed sequence that goes 1,2,...,h, then down, summing exactly Lorig
+        std::vector<int> speeds;
+        int rem = Lorig;
+        int currSpeed = 1;
+        while (true) {
+            int sumDown = (currSpeed - 1) * currSpeed / 2;
+            if (rem - currSpeed - 1 >= sumDown) {
+                speeds.push_back(currSpeed);
+                rem -= currSpeed;
+                ++currSpeed;
+            } else {
+                break;
+            }
+        }
+        int h = currSpeed - 1;
+        if (h < 1) {
+            // cannot form a proper accel/decel profile
+            idx++;
+            continue;
+        }
+        // distribute any leftover rem by adding smaller speeds in descending order
+        for (int d = h - 1; d >= 1 && rem > 0; --d) {
+            if (rem >= d) {
+                speeds.push_back(d);
+                rem -= d;
+            }
+        }
+        while (rem > 0) {
+            speeds.push_back(1);
+            rem -= 1;
+        }
+        if (rem != 0) {
+            // something went wrong
+            idx++;
+            continue;
+        }
+
+        // 6) Build the mini path of States from startSt → endSt
+        std::vector<State> mini;
+        mini.push_back(startSt);
+        bool canBuildMini = true;
+        for (int j = 0; j < (int)speeds.size(); ++j) {
+            int sp = speeds[j];
+            Coord vel{ du.row * sp, du.col * sp };
+
+            State nxt;
+            nxt.pos = {
+                mini.back().pos.row + vel.row,
+                mini.back().pos.col + vel.col
+            };
+            nxt.vel = vel;
+
+            State &prevSt = mini.back();
+            // (a) Check grass‐rule at prevSt
+            if (t.at(prevSt.pos.row, prevSt.pos.col) == 'G' &&
+                violatesGrassRule(prevSt.vel, vel)) {
+                canBuildMini = false;
+                break;
+            }
+            // (b) Check bounds & collision from prevSt.pos → nxt.pos
+            if (!isInside(nxt.pos) || !isPathClear(prevSt.pos, nxt.pos)) {
+                canBuildMini = false;
+                break;
+            }
+            mini.push_back(nxt);
+        }
+
+        // 7) Confirm mini actually ends exactly at endSt
+        if (!canBuildMini) {
+            idx++;
+            continue;
+        }
+        State &lastMini = mini.back();
+        if (lastMini.pos.row  != endSt.pos.row ||
+            lastMini.pos.col  != endSt.pos.col ||
+            lastMini.vel.row  != du.row         ||
+            lastMini.vel.col  != du.col) {
+            idx++;
+            continue;
+        }
+
+        // 8) Splice mini into p: remove old middle, insert new intermediate states
+        //    Erase from (s+1) up to but not including e
+        p.erase(p.begin() + (s + 1), p.begin() + e);
+
+        //    Now insert mini[1..mini.size()-2], if any
+        if (mini.size() > 2) {
+            p.insert(
+                p.begin() + (s + 1),
+                mini.begin() + 1,
+                mini.end()   - 1
+            );
+        }
+
+        // 9) Advance idx so we skip over the newly‐inserted mini segment
+        //    The new length of that block (including endpoints) is mini.size().
+        idx = s + ((int)mini.size());
     }
 
-    if (mini.back().pos.col != endSt.pos.col || mini.back().pos.row != endSt.pos.row || mini.back().vel.col != du.col || mini.back().vel.row != du.row) {
-        return;
-    }
-    p.erase(p.begin() + s + 1, p.begin() + e);
-    p.insert(p.begin() + s + 1,
-             mini.begin() + 1,
-             mini.end()   - 1);
-
+    return p;
 }
 
+
 std::vector<State> SimulatedAnnealer::run(double startTemp, double coolingRate, double minTemp) {
+    currentPath = tryAccelDecelStraight(currentPath);
     auto best = currentPath;
     double bestCost = computeCost(currentPath);
     double temp = startTemp;

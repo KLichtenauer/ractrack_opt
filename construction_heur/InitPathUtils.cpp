@@ -15,7 +15,7 @@
 
 #include "Track.h"
 
-static const int MAX_VELOCITY = 20;
+static const int MAX_VELOCITY = 1;
 
 static std::tuple<int,int,int,int> makeKey(const State &s) {
     return {s.pos.row, s.pos.col, s.vel.row, s.vel.col};
@@ -90,38 +90,67 @@ static bool isPathClear(const Track &t, const Coord &from, const Coord &to) {
     return true;
 }
 
-vector<vector<int> > createClearance(Track &t) {
-    deque<Coord> qClearance;
-    vector clearance(t.height(), vector<int>(t.width(), INT_MAX));
+vector<vector<int>> createClearance(Track &t) {
+    int H = t.height();
+    int W = t.width();
+    const int INF = INT_MAX;
+    // Change this to 1 if you want grass to cost exactly the same as a normal cell,
+    // or to 3 (etc.) for a bigger penalty.
+    const int grassCost = 1;
+    const int normalCost = 2;
 
-    for (int row = 0; row < t.height(); row++) {
-        for (int column = 0; column < t.width(); column++) {
-            if (t.at(row, column) == 'G') {
-                clearance[row][column] = 0;
-                qClearance.emplace_back(row, column);
+    // distance[r][c] = minimum cost to reach any wall (“O”)
+    vector<vector<int>> distance(H, vector<int>(W, INF));
+
+    // Min‐heap of (currentDist, row, col).  We start from all walls at distance 0.
+    using Elem = pair<int, pair<int,int>>;
+    priority_queue<Elem, vector<Elem>, greater<Elem>> pq;
+
+    // 1) Initialize: walls get distance 0 and go into the PQ
+    for (int r = 0; r < H; ++r) {
+        for (int c = 0; c < W; ++c) {
+            if (t.at(r, c) == 'O') {
+                distance[r][c] = 0;
+                pq.push({0, {r, c}});
             }
         }
     }
 
-    while (!qClearance.empty() && qClearance.size() > 0) {
-        Coord c = qClearance.front();
-        qClearance.pop_front();
-        for (auto [row, column]: {
-                 pair<int, int>{c.row - 1, c.col},
-                 pair<int, int>{c.row, c.col - 1},
-                 pair<int, int>{c.row + 1, c.col},
-                 pair<int, int>{c.row, c.col + 1}
-             }) {
-            if (row < 0 || column < 0 || row >= t.height() || column >= t.width()) continue;
-            if (t.at(row, column) == 'O' || t.at(row, column) == 'G') continue;
+    // 2) Standard Dijkstra over the 4‐connected grid
+    const int dr[4] = { -1, +1,  0,  0 };
+    const int dc[4] = {  0,  0, -1, +1 };
 
-            if (clearance[row][column] > clearance[c.row][c.col] + 1) {
-                clearance[row][column] = clearance[c.row][c.col] + 1;
-                qClearance.emplace_back(row, column);
+    while (!pq.empty()) {
+        auto [d, rc] = pq.top();
+        pq.pop();
+        int r = rc.first;
+        int c = rc.second;
+
+        // If we’ve already found a better way, skip:
+        if (d > distance[r][c]) continue;
+
+        // Expand to neighbors
+        for (int i = 0; i < 4; ++i) {
+            int nr = r + dr[i], nc = c + dc[i];
+            if (nr < 0 || nc < 0 || nr >= H || nc >= W)
+                continue;
+
+            // We never step into a wall; walls stay at distance 0, but we don't traverse them.
+            if (t.at(nr, nc) == 'O')
+                continue;
+
+            // Determine the cost of entering (nr,nc):
+            int stepCost = (t.at(nr, nc) == 'G' ? grassCost : normalCost);
+            int newDist = d + stepCost;
+
+            if (newDist < distance[nr][nc]) {
+                distance[nr][nc] = newDist;
+                pq.push({newDist, {nr, nc}});
             }
         }
     }
-    return clearance;
+
+    return distance;
 }
 
 static vector<vector<int>> createFinishDist(const Track &t) {
@@ -153,7 +182,7 @@ static vector<vector<int>> createFinishDist(const Track &t) {
 vector<State> InitPathUtils::initPath(Track &t) {
     const Coord startPos = t.start;
     const State startState{startPos, Coord{0, 0}};
-/*
+
     int H = t.height(), W = t.width();
     auto clearance = createClearance(t);
     auto finishDist = createFinishDist(t);
@@ -183,8 +212,8 @@ vector<State> InitPathUtils::initPath(Track &t) {
         return score[a.pos.row][a.pos.col]
              < score[b.pos.row][b.pos.col];
     };
-    */
-    queue<State> q;
+
+    std::priority_queue<State, std::vector<State>, decltype(cmp)> q(cmp);
     std::unordered_map<std::tuple<int,int,int,int>, bool,       TupleHash, TupleEqual> visited;
     std::unordered_map<std::tuple<int,int,int,int>, State,      TupleHash, TupleEqual> parent;
 
@@ -195,7 +224,7 @@ vector<State> InitPathUtils::initPath(Track &t) {
     bool found = false;
 
     while (!q.empty() && !found) {
-        State cur = q.front(); q.pop();
+        State cur = q.top(); q.pop();
         for (auto &f : t.finishLine) {
             if (cur.pos.row == f.row && cur.pos.col == f.col) {
                 goal = cur;

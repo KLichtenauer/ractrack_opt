@@ -33,7 +33,7 @@ private:
     void tryTwoStepShortcut(std::vector<State> &p);
     void tryThreeStepShortcut(std::vector<State> &p);
     void tryInsertStep(std::vector<State> &p);
-    void tryAccelDecelStraight(std::vector<State> &p);
+    std::vector<State> tryAccelDecelStraight(std::vector<State> &p);
 
     bool isInside(const Coord& c) const;
     bool isPathClear(const Coord& from, const Coord& to) const;
