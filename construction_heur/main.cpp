@@ -19,19 +19,25 @@ int main() {
         size_t steps;
     };
     vector<Summary> summaries;
+
+    // Loop over input files
     for (int i = 0; i < inputFiles.size(); i++) {
         string inputFile = inputFiles[i];
         string inputPath = "../data/programmingExercise/" + inputFile + ".t";
 
+        // Start timer
         auto t0 = chrono::high_resolution_clock::now();
         Track t;
         if (!t.load(inputPath)) return 1;
 
+        // Run the construction heuristic
         vector<State> initPath = InitPathUtils::initPath(t);
 
+        // Run the metaheuristic optimization
         SimulatedAnnealer simulated_annealer(t, initPath);
         vector<State> result = simulated_annealer.run(10000, 0.995, 0.01);
 
+        // Stop the timer
         auto t1 = chrono::high_resolution_clock::now();
         double durationSeconds = chrono::duration<double>(t1 - t0).count();
 
@@ -42,9 +48,10 @@ int main() {
             return 1;
         }
 
-
+        // Save track summary
         summaries.push_back({ inputFile, durationSeconds, result.size() });
 
+        // Write results to pdf
         outFile << Track::to_json(result, t.height());
         outFile.close();
         string trackFilePath = "programmingExercise/" + inputFile + ".t";
@@ -54,7 +61,6 @@ int main() {
                         + inputFile + ".t "
                         + tripFilePath + " ../data/outputs/" + inputFile;
         system(visCmd.c_str());
-
         string pdfLatexCmd = "cd .. && cd data && pdflatex "+  outputFilePath;
         system(pdfLatexCmd.c_str());
 

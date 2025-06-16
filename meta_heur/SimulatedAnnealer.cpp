@@ -63,6 +63,7 @@ double SimulatedAnnealer::computeCost(const std::vector<State>& path) {
     return static_cast<double>(path.size());
 }
 
+// mutates the path
 std::vector<State> SimulatedAnnealer::mutatePath(const std::vector<State>& path) {
     std::vector<State> p = path;
     lastOp = std::uniform_int_distribution<int>{0,2}(rng);
@@ -153,7 +154,7 @@ void SimulatedAnnealer::tryThreeStepShortcut(std::vector<State>& p) {
     }
 }
 
-
+// NOT WORKING AS EXPECTED
 void SimulatedAnnealer::tryInsertStep(std::vector<State>& p) {
     if (p.size() < 2) return;
 
@@ -188,25 +189,22 @@ void SimulatedAnnealer::tryInsertStep(std::vector<State>& p) {
     }
 }
 
+// ACCELERATE ON STRAIGHTS
 vector<State> SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
     int n = (int)p.size();
     if (n < 3) return p;
 
-    // idx is our current scan position in p
     int idx = 0;
     while (idx + 2 < (int)p.size()) {
-        // 1) Compute the “direction” from p[idx] → p[idx+1]
         Coord d1{
             p[idx+1].pos.row - p[idx].pos.row,
             p[idx+1].pos.col - p[idx].pos.col
         };
         if (d1.row == 0 && d1.col == 0) {
-            // no motion, skip forward
             ++idx;
             continue;
         }
 
-        // 2) Find how far this same direction continues
         int endIdx = idx + 1;
         while (endIdx + 1 < (int)p.size()) {
             Coord d2{
@@ -217,20 +215,16 @@ vector<State> SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
             ++endIdx;
         }
 
-        int runLength = endIdx - idx;  // number of steps in this straight run
+        int runLength = endIdx - idx;
         if (runLength < 3) {
-            // too short to splice; move on
             idx++;
             continue;
         }
 
-        // 3) We have a candidate run from idx ... endIdx (inclusive)
-        //    Let s = idx, e = endIdx. We will try to build an “accel‐decel” mini‐path of exactly runLength steps.
         int s = idx;
         int e = endIdx;
-        int Lorig = e - s;          // number of “steps” between p[s] and p[e]
+        int Lorig = e - s;
 
-        // If Lorig is odd, drop the last step so we have an even count
         if (Lorig % 2 == 1) {
             --e;
             --Lorig;
@@ -243,13 +237,11 @@ vector<State> SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
         State startSt = p[s];
         State endSt   = p[e];
 
-        // 4) Compute a unit “du” so that each new velocity is along the same straight direction
         Coord du{
             d1.row >  0 ?  1 : (d1.row <  0 ? -1 : 0),
             d1.col >  0 ?  1 : (d1.col <  0 ? -1 : 0)
         };
 
-        // 5) Build a speed sequence that goes 1,2,...,h, then down, summing exactly Lorig
         std::vector<int> speeds;
         int rem = Lorig;
         int currSpeed = 1;
@@ -265,11 +257,9 @@ vector<State> SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
         }
         int h = currSpeed - 1;
         if (h < 1) {
-            // cannot form a proper accel/decel profile
             idx++;
             continue;
         }
-        // distribute any leftover rem by adding smaller speeds in descending order
         for (int d = h - 1; d >= 1 && rem > 0; --d) {
             if (rem >= d) {
                 speeds.push_back(d);
@@ -281,12 +271,10 @@ vector<State> SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
             rem -= 1;
         }
         if (rem != 0) {
-            // something went wrong
             idx++;
             continue;
         }
 
-        // 6) Build the mini path of States from startSt → endSt
         std::vector<State> mini;
         mini.push_back(startSt);
         bool canBuildMini = true;
@@ -302,21 +290,17 @@ vector<State> SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
             nxt.vel = vel;
 
             State &prevSt = mini.back();
-            // (a) Check grass‐rule at prevSt
             if (t.at(prevSt.pos.row, prevSt.pos.col) == 'G' &&
                 violatesGrassRule(prevSt.vel, vel)) {
                 canBuildMini = false;
                 break;
             }
-            // (b) Check bounds & collision from prevSt.pos → nxt.pos
             if (!isInside(nxt.pos) || !isPathClear(prevSt.pos, nxt.pos)) {
                 canBuildMini = false;
                 break;
             }
             mini.push_back(nxt);
         }
-
-        // 7) Confirm mini actually ends exactly at endSt
         if (!canBuildMini) {
             idx++;
             continue;
@@ -330,11 +314,8 @@ vector<State> SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
             continue;
         }
 
-        // 8) Splice mini into p: remove old middle, insert new intermediate states
-        //    Erase from (s+1) up to but not including e
         p.erase(p.begin() + (s + 1), p.begin() + e);
 
-        //    Now insert mini[1..mini.size()-2], if any
         if (mini.size() > 2) {
             p.insert(
                 p.begin() + (s + 1),
@@ -343,15 +324,13 @@ vector<State> SimulatedAnnealer::tryAccelDecelStraight(std::vector<State>& p) {
             );
         }
 
-        // 9) Advance idx so we skip over the newly‐inserted mini segment
-        //    The new length of that block (including endpoints) is mini.size().
         idx = s + ((int)mini.size());
     }
 
     return p;
 }
 
-
+// Runs the simulated annealer
 std::vector<State> SimulatedAnnealer::run(double startTemp, double coolingRate, double minTemp) {
     currentPath = tryAccelDecelStraight(currentPath);
     auto best = currentPath;

@@ -15,6 +15,7 @@
 
 #include "Track.h"
 
+// THIS VALUE CONTROLS THE MAXIMUM VELOCITY OF THE CONSTRUCTION HEURISTIC
 static const int MAX_VELOCITY = 1;
 
 static std::tuple<int,int,int,int> makeKey(const State &s) {
@@ -90,23 +91,20 @@ static bool isPathClear(const Track &t, const Coord &from, const Coord &to) {
     return true;
 }
 
+// CREATES A CLEARANCE MAP OF THE TRACK
+// GRASS STEPS ARE COUNTED DOUBLE
 vector<vector<int>> createClearance(Track &t) {
     int H = t.height();
     int W = t.width();
     const int INF = INT_MAX;
-    // Change this to 1 if you want grass to cost exactly the same as a normal cell,
-    // or to 3 (etc.) for a bigger penalty.
     const int grassCost = 1;
     const int normalCost = 2;
 
-    // distance[r][c] = minimum cost to reach any wall (“O”)
     vector<vector<int>> distance(H, vector<int>(W, INF));
 
-    // Min‐heap of (currentDist, row, col).  We start from all walls at distance 0.
     using Elem = pair<int, pair<int,int>>;
     priority_queue<Elem, vector<Elem>, greater<Elem>> pq;
 
-    // 1) Initialize: walls get distance 0 and go into the PQ
     for (int r = 0; r < H; ++r) {
         for (int c = 0; c < W; ++c) {
             if (t.at(r, c) == 'O') {
@@ -116,7 +114,6 @@ vector<vector<int>> createClearance(Track &t) {
         }
     }
 
-    // 2) Standard Dijkstra over the 4‐connected grid
     const int dr[4] = { -1, +1,  0,  0 };
     const int dc[4] = {  0,  0, -1, +1 };
 
@@ -126,20 +123,16 @@ vector<vector<int>> createClearance(Track &t) {
         int r = rc.first;
         int c = rc.second;
 
-        // If we’ve already found a better way, skip:
         if (d > distance[r][c]) continue;
 
-        // Expand to neighbors
         for (int i = 0; i < 4; ++i) {
             int nr = r + dr[i], nc = c + dc[i];
             if (nr < 0 || nc < 0 || nr >= H || nc >= W)
                 continue;
 
-            // We never step into a wall; walls stay at distance 0, but we don't traverse them.
             if (t.at(nr, nc) == 'O')
                 continue;
 
-            // Determine the cost of entering (nr,nc):
             int stepCost = (t.at(nr, nc) == 'G' ? grassCost : normalCost);
             int newDist = d + stepCost;
 
@@ -153,6 +146,7 @@ vector<vector<int>> createClearance(Track &t) {
     return distance;
 }
 
+// CREATES A MAP OF DISTANCES TO THE FINISH
 static vector<vector<int>> createFinishDist(const Track &t) {
     int H = t.height(), W = t.width();
     vector<vector<int>> dist(H, vector<int>(W, INT_MAX));
@@ -179,6 +173,7 @@ static vector<vector<int>> createFinishDist(const Track &t) {
     return dist;
 }
 
+// RUNS THE CONSTRUCTION HEURISTIC
 vector<State> InitPathUtils::initPath(Track &t) {
     const Coord startPos = t.start;
     const State startState{startPos, Coord{0, 0}};
@@ -198,12 +193,13 @@ vector<State> InitPathUtils::initPath(Track &t) {
         }
     }
 
-    const double α = 0.7;
+    // This value controls how much the two maps are considered
+    const double α = 0.8;
     vector<vector<double>> score(H, vector<double>(W, 0.0));
     for (int r = 0; r < H; ++r) {
         for (int c = 0; c < W; ++c) {
-            double cNorm = clearance[r][c] / maxC;       // 0…1
-            double dNorm = finishDist[r][c] / maxD;      // 0…1
+            double cNorm = clearance[r][c] / maxC;
+            double dNorm = finishDist[r][c] / maxD;
             score[r][c] = α * cNorm + (1-α) * (1.0 - dNorm);
         }
     }
